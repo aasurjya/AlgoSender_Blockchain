@@ -1,115 +1,165 @@
-import Link from "next/link";
+"use client"
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { TrendingUp, CheckCircle, Clock, XCircle, Wallet, Activity, History } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { algorandApi, type Stats } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
+
+export default function Dashboard() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await algorandApi.getStats();
+      setStats(response.data);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to fetch stats',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
+    { title: 'Total Transactions', value: stats?.total || 0, icon: TrendingUp, color: 'from-blue-500 to-cyan-500' },
+    { title: 'Confirmed', value: stats?.confirmed || 0, icon: CheckCircle, color: 'from-green-500 to-emerald-500' },
+    { title: 'Pending', value: stats?.pending || 0, icon: Clock, color: 'from-yellow-500 to-orange-500' },
+    { title: 'Failed', value: stats?.failed || 0, icon: XCircle, color: 'from-red-500 to-pink-500' },
+  ];
+
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-950">
-      {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/70 dark:bg-black/70 border-b border-gray-200 dark:border-gray-800">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold">A</span>
-            </div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">AlgoSender</h1>
-          </div>
-          <nav>
-            <ul className="flex space-x-4">
-              <li>
-                <Link 
-                  href="/dashboard" 
-                  className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-                >
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/send" 
-                  className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-                >
-                  Send
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/transactions" 
-                  className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-                >
-                  Transactions
-                </Link>
-              </li>
-            </ul>
-          </nav>
+    <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-8 text-white shadow-2xl"
+      >
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2">Welcome to AlgoSender</h1>
+          <p className="text-lg text-blue-100">Send and track Algorand TestNet transactions with ease</p>
         </div>
-      </header>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+      </motion.div>
 
-      {/* Hero section */}
-      <main className="flex-grow flex items-center justify-center p-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-            <span className="text-blue-600 dark:text-blue-400">Send and Track</span> Algorand TestNet Transactions
-          </h1>
-          
-          <p className="text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-            AlgoSender makes it easy to send, monitor, and manage your Algorand TestNet transactions in one place.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              href="/send" 
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+      <motion.section
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
+        <Card className="glass-card hover:shadow-xl transition-all duration-200">
+          <CardHeader>
+            <div className="w-12 h-12 gradient-apple-blue rounded-xl flex items-center justify-center mb-2">
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
+            <CardTitle>Send ALGO</CardTitle>
+            <CardDescription>Secure TestNet transactions with validation</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className="glass-card hover:shadow-xl transition-all duration-200">
+          <CardHeader>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-2">
+              <Activity className="w-6 h-6 text-white" />
+            </div>
+            <CardTitle>Track Status</CardTitle>
+            <CardDescription>Real-time monitoring and confirmation</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className="glass-card hover:shadow-xl transition-all duration-200">
+          <CardHeader>
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-2">
+              <History className="w-6 h-6 text-white" />
+            </div>
+            <CardTitle>View History</CardTitle>
+            <CardDescription>Detailed transaction analytics</CardDescription>
+          </CardHeader>
+        </Card>
+      </motion.section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
             >
-              Send Transaction
-            </Link>
-            <Link 
-              href="/dashboard" 
-              className="px-6 py-3 bg-white hover:bg-gray-100 text-blue-600 font-semibold rounded-lg shadow-md border border-gray-200 transition-colors dark:bg-gray-800 dark:text-blue-400 dark:border-gray-700 dark:hover:bg-gray-700"
-            >
-              View Dashboard
-            </Link>
-          </div>
-        </div>
-      </main>
+              <Card className="relative overflow-hidden border-2 hover:shadow-xl transition-shadow">
+                <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} opacity-10 rounded-full blur-2xl`} />
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+                    <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.color}`}>
+                      <Icon className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{loading ? '...' : stat.value}</div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
 
-      {/* Features section */}
-      <section className="py-16 bg-white dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Features</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 rounded-lg bg-blue-50 dark:bg-gray-800">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mb-4">
-                <span className="text-blue-600 dark:text-blue-300 text-xl">📤</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Total ALGO Sent</CardTitle>
+              <CardDescription>Confirmed transactions only</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {loading ? '...' : `${stats?.totalAlgoSent?.toFixed(2) || 0} ALGO`}
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Send Transactions</h3>
-              <p className="text-gray-700 dark:text-gray-300">Easily send Algorand TestNet transactions with just a mnemonic phrase and recipient address.</p>
-            </div>
-            
-            <div className="p-6 rounded-lg bg-blue-50 dark:bg-gray-800">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mb-4">
-                <span className="text-blue-600 dark:text-blue-300 text-xl">🔍</span>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Success Rate</CardTitle>
+              <CardDescription>Confirmed vs Total transactions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                {loading ? '...' : stats?.successRate || '0%'}
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Track Status</h3>
-              <p className="text-gray-700 dark:text-gray-300">Monitor your transaction status in real-time with automatic updates and notifications.</p>
-            </div>
-            
-            <div className="p-6 rounded-lg bg-blue-50 dark:bg-gray-800">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mb-4">
-                <span className="text-blue-600 dark:text-blue-300 text-xl">📊</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Analytics</h3>
-              <p className="text-gray-700 dark:text-gray-300">View detailed statistics about your transaction history, including success rates and total amounts.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
 
-      {/* Footer */}
-      <footer className="py-8 bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800">
-        <div className="container mx-auto px-4 text-center text-gray-700 dark:text-gray-300">
-          <p>© 2026 AlgoSender. Built with Next.js and Algorand.</p>
-        </div>
-      </footer>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              Network Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p>✅ Connected to <span className="font-semibold text-foreground">Algorand TestNet</span></p>
+            <p className="mt-2">⚠️ This application is for educational purposes only. Never use mainnet private keys.</p>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

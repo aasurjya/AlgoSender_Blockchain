@@ -1,296 +1,312 @@
-"use client";
+"use client"
 
-import { useState, FormEvent } from 'react';
-import Link from 'next/link';
-
-interface FormData {
-  mnemonic: string;
-  recipientAddress: string;
-  amount: string;
-  note: string;
-}
-
-interface TransactionResult {
-  txId: string;
-  from: string;
-  to: string;
-  amount: number;
-  note?: string;
-}
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Send, Copy, ExternalLink, Loader2, AlertCircle, Lock } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { algorandApi } from '@/lib/api';
+import { copyToClipboard } from '@/lib/utils';
+import { useWallet } from '@/contexts/WalletContext';
 
 export default function SendTransaction() {
-  const [formData, setFormData] = useState<FormData>({
+  const { isLoggedIn, address: walletAddress, mnemonic: walletMnemonic, login } = useWallet();
+  const [formData, setFormData] = useState({
     mnemonic: '',
     recipientAddress: '',
     amount: '',
     note: '',
   });
-  
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TransactionResult | null>(null);
+  const [txResult, setTxResult] = useState<any>(null);
+  const [senderAddress, setSenderAddress] = useState('');
+  const [checkingBalance, setCheckingBalance] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [showReauthPrompt, setShowReauthPrompt] = useState(false);
+  const [reauthMnemonic, setReauthMnemonic] = useState('');
+  const { toast } = useToast();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const needsReauth = isLoggedIn && !walletMnemonic;
+
+  useEffect(() => {
+    if (isLoggedIn && walletAddress) {
+      setSenderAddress(walletAddress);
+    } else {
+      setSenderAddress('');
+    }
+  }, [isLoggedIn, walletAddress]);
+
+  useEffect(() => {
+    const deriveAddress = async () => {
+      if (formData.mnemonic.trim() && !isLoggedIn) {
+        try {
+          const res = await algorandApi.deriveAddress(formData.mnemonic);
+          if (res?.success && res?.data?.address) {
+            setSenderAddress(res.data.address);
+          }
+        } catch (e) {
+          setSenderAddress('');
+        }
+      }
+    };
+    deriveAddress();
+  }, [formData.mnemonic, isLoggedIn]);
 
   const handleGenerateMnemonic = async () => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/generate-mnemonic');
-      const data = await response.json();
-      
-      if (data.success) {
-        setFormData((prev) => ({ ...prev, mnemonic: data.data.mnemonic }));
-      } else {
-        setError(data.message || 'Failed to generate mnemonic');
+      const res = await algorandApi.generateMnemonic();
+      if (res?.success && res?.data?.mnemonic) {
+        setFormData((prev) => ({ ...prev, mnemonic: res.data.mnemonic }));
+        setSenderAddress(res.data.address);
+        toast({ title: 'Mnemonic Generated', description: `Address: ${res.data.address}` });
       }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (e: any) {
+      toast({ title: 'Generation Failed', description: e?.message || 'Unable to generate mnemonic', variant: 'destructive' });
+    }
+  };
+
+  const handleCheckBalance = async () => {
+    if (!senderAddress) {
+      toast({ title: 'No Address', description: 'Please enter or generate a mnemonic first', variant: 'destructive' });
+      return;
+    }
+    setCheckingBalance(true);
+    try {
+      const res = await algorandApi.getBalance(senderAddress);
+      if (res?.success) {
+        setBalance(res.data.balance);
+        toast({ title: 'Balance Retrieved', description: `${res.data.balance} ALGO` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Balance Check Failed', description: e?.response?.data?.message || 'Unable to fetch balance', variant: 'destructive' });
+    } finally {
+      setCheckingBalance(false);
+    }
+  };
+
+  const handleReauth = async () => {
+    if (!reauthMnemonic.trim()) {
+      toast({ title: 'Error', description: 'Please enter your mnemonic phrase', variant: 'destructive' });
+      return;
+    }
+    try {
+      await login(reauthMnemonic.trim());
+      setShowReauthPrompt(false);
+      setReauthMnemonic('');
+      toast({ title: 'Success', description: 'Wallet re-authenticated successfully' });
+    } catch (error: any) {
+      toast({ title: 'Authentication Failed', description: error.message || 'Invalid mnemonic phrase', variant: 'destructive' });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let mnemonicToUse: string | null = null;
+    
+    if (isLoggedIn) {
+      mnemonicToUse = walletMnemonic;
+      if (!mnemonicToUse) {
+        setShowReauthPrompt(true);
+        return;
+      }
+    } else {
+      mnemonicToUse = formData.mnemonic;
+    }
+
+    if (!mnemonicToUse || !formData.recipientAddress || !formData.amount) {
+      toast({ title: 'Validation Error', description: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+
+    const recipientAddr = formData.recipientAddress.trim();
+    if (recipientAddr.length !== 58) {
+      toast({ title: 'Invalid Recipient Address', description: 'Algorand address must be exactly 58 characters', variant: 'destructive' });
+      return;
+    }
+
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: 'Invalid Amount', description: 'Amount must be a positive number', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    setTxResult(null);
+
+    try {
+      const payload: any = { recipientAddress: recipientAddr, amount: amount, mnemonic: mnemonicToUse };
+      if (formData.note) payload.note = formData.note;
+
+      const response = await algorandApi.sendTransaction(payload);
+      setTxResult(response.data);
+      toast({ title: 'Transaction Sent!', description: `Transaction ID: ${response.data.txId}` });
+      setFormData({ mnemonic: '', recipientAddress: '', amount: '', note: '' });
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to send transaction';
+      toast({ title: 'Transaction Failed', description: errorMsg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setResult(null);
-
-    // Basic validation
-    if (!formData.mnemonic.trim()) {
-      setError('Mnemonic is required');
-      return;
-    }
-    
-    if (!formData.recipientAddress.trim()) {
-      setError('Recipient address is required');
-      return;
-    }
-    
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      setError('Amount must be a positive number');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      const response = await fetch('/api/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mnemonic: formData.mnemonic,
-          recipientAddress: formData.recipientAddress,
-          amount,
-          note: formData.note || undefined,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setResult(data.data);
-        // Reset form except for mnemonic
-        setFormData((prev) => ({
-          mnemonic: prev.mnemonic,
-          recipientAddress: '',
-          amount: '',
-          note: '',
-        }));
-      } else {
-        setError(data.message || 'Failed to send transaction');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
+  const handleCopy = (text: string) => {
+    copyToClipboard(text);
+    toast({ title: 'Copied!', description: 'Copied to clipboard' });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/70 dark:bg-black/70 border-b border-gray-200 dark:border-gray-800">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-white font-bold">A</span>
-              </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">AlgoSender</h1>
-            </Link>
-          </div>
-          <nav>
-            <ul className="flex space-x-4">
-              <li>
-                <Link 
-                  href="/dashboard" 
-                  className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-                >
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/send" 
-                  className="text-blue-600 font-medium dark:text-blue-400"
-                >
-                  Send
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/transactions" 
-                  className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-                >
-                  Transactions
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </header>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-3xl font-bold">Send ALGO</h1>
+        <p className="text-muted-foreground mt-2">Send Algorand tokens on the TestNet</p>
+      </motion.div>
 
-      {/* Main content */}
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Send Transaction</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Send className="w-5 h-5" />Transaction Details</CardTitle>
+              <CardDescription>Enter the details to send ALGO on TestNet</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!isLoggedIn && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mnemonic">Sender Mnemonic <span className="text-red-500">*</span></Label>
+                    <div className="flex items-center gap-2">
+                      <Textarea id="mnemonic" placeholder="Enter your 25-word mnemonic phrase" value={formData.mnemonic} onChange={(e) => setFormData({ ...formData, mnemonic: e.target.value })} rows={3} className="font-mono text-sm flex-1" />
+                      <Button type="button" variant="outline" size="sm" onClick={handleGenerateMnemonic}>Generate</Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">⚠️ Never share your mainnet mnemonic. TestNet only!</p>
+                    {senderAddress && (
+                      <div className="mt-3 p-3 bg-muted rounded-lg space-y-2">
+                        <Label className="text-xs font-semibold">Sender Address:</Label>
+                        <p className="font-mono text-xs break-all">{senderAddress}</p>
+                        <div className="flex items-center gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={handleCheckBalance} disabled={checkingBalance}>
+                            {checkingBalance ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Checking...</> : 'Check Balance'}
+                          </Button>
+                          {balance !== null && <span className="text-sm font-semibold">{balance} ALGO</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-        {result && (
-          <div className="mb-8 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-green-800 dark:text-green-400 mb-4">
-              Transaction Sent Successfully!
-            </h2>
-            <div className="space-y-2 text-sm">
-              <p><span className="font-medium text-gray-700 dark:text-gray-300">Transaction ID:</span> <span className="font-mono">{result.txId}</span></p>
-              <p><span className="font-medium text-gray-700 dark:text-gray-300">From:</span> <span className="font-mono">{result.from}</span></p>
-              <p><span className="font-medium text-gray-700 dark:text-gray-300">To:</span> <span className="font-mono">{result.to}</span></p>
-              <p><span className="font-medium text-gray-700 dark:text-gray-300">Amount:</span> {result.amount} ALGO</p>
-              {result.note && <p><span className="font-medium text-gray-700 dark:text-gray-300">Note:</span> {result.note}</p>}
-            </div>
-            <div className="mt-4 flex space-x-4">
-              <Link
-                href={`/transactions`}
-                className="text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
-              >
-                View All Transactions
-              </Link>
-              <Link
-                href={`/status/${result.txId}`}
-                className="text-sm font-medium text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
-              >
-                Check Status
-              </Link>
-            </div>
-          </div>
-        )}
+                {(isLoggedIn && senderAddress) && (
+                  <div className={`p-4 rounded-lg border ${needsReauth || showReauthPrompt ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${needsReauth || showReauthPrompt ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                        <Lock className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-semibold ${needsReauth || showReauthPrompt ? 'text-yellow-900 dark:text-yellow-100' : 'text-green-900 dark:text-green-100'}`}>
+                          {needsReauth || showReauthPrompt ? 'Re-authentication Required' : 'Wallet Connected'}
+                        </p>
+                        <p className={`text-xs font-mono break-all ${needsReauth || showReauthPrompt ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-300'}`}>{senderAddress}</p>
+                      </div>
+                    </div>
+                    {(needsReauth || showReauthPrompt) && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs text-yellow-700 dark:text-yellow-300">Your session expired. Please re-enter your mnemonic.</p>
+                        <Textarea placeholder="Enter your 25-word mnemonic phrase" value={reauthMnemonic} onChange={(e) => setReauthMnemonic(e.target.value)} rows={2} className="font-mono text-sm" />
+                        <Button type="button" size="sm" onClick={handleReauth} className="w-full">Re-authenticate Wallet</Button>
+                      </div>
+                    )}
+                    {balance !== null && !needsReauth && !showReauthPrompt && (
+                      <div className="mt-2 text-sm font-semibold text-green-900 dark:text-green-100">Balance: {balance} ALGO</div>
+                    )}
+                  </div>
+                )}
 
-        {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-red-700 dark:text-red-400">{error}</p>
-          </div>
-        )}
+                <div className="space-y-2">
+                  <Label htmlFor="recipient">Recipient Address <span className="text-red-500">*</span></Label>
+                  <Input id="recipient" placeholder="ALGO address (58 characters)" value={formData.recipientAddress} onChange={(e) => setFormData({ ...formData, recipientAddress: e.target.value })} className="font-mono" />
+                </div>
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="space-y-6">
-            {/* Mnemonic */}
-            <div>
-              <label htmlFor="mnemonic" className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-200">
-                Mnemonic Phrase
-              </label>
-              <div className="flex space-x-2">
-                <textarea
-                  id="mnemonic"
-                  name="mnemonic"
-                  value={formData.mnemonic}
-                  onChange={handleChange}
-                  placeholder="Enter your mnemonic phrase (25 words)"
-                  className="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  rows={2}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={handleGenerateMnemonic}
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 rounded-lg transition-colors"
-                >
-                  Generate
-                </button>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Your mnemonic is only used locally and never stored.
-              </p>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount (ALGO) <span className="text-red-500">*</span></Label>
+                  <Input id="amount" type="number" step="0.000001" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+                </div>
 
-            {/* Recipient Address */}
-            <div>
-              <label htmlFor="recipientAddress" className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-200">
-                Recipient Address
-              </label>
-              <input
-                type="text"
-                id="recipientAddress"
-                name="recipientAddress"
-                value={formData.recipientAddress}
-                onChange={handleChange}
-                placeholder="Enter Algorand address"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                required
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="note">Note (Optional)</Label>
+                  <Input id="note" placeholder="Add a note (max 1000 bytes)" value={formData.note} onChange={(e) => setFormData({ ...formData, note: e.target.value })} maxLength={1000} />
+                </div>
 
-            {/* Amount */}
-            <div>
-              <label htmlFor="amount" className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-200">
-                Amount (ALGO)
-              </label>
-              <input
-                type="number"
-                id="amount"
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                placeholder="0.0"
-                min="0.000001"
-                step="0.000001"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                required
-              />
-            </div>
+                <Button type="submit" className="w-full" disabled={loading} size="lg">
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending Transaction...</> : <><Send className="w-4 h-4 mr-2" />Send ALGO</>}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            {/* Note */}
-            <div>
-              <label htmlFor="note" className="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-200">
-                Note (Optional)
-              </label>
-              <input
-                type="text"
-                id="note"
-                name="note"
-                value={formData.note}
-                onChange={handleChange}
-                placeholder="Add a note to the transaction"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-              />
-            </div>
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="space-y-6">
+          {txResult ? (
+            <Card className="border-2 border-green-500">
+              <CardHeader>
+                <CardTitle className="text-green-600 dark:text-green-400 flex items-center gap-2"><AlertCircle className="w-5 h-5" />Transaction Sent Successfully</CardTitle>
+                <CardDescription>Your transaction has been broadcast to the network</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Transaction ID</Label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 p-2 bg-muted rounded text-xs break-all">{txResult.txId}</code>
+                    <Button variant="outline" size="icon" onClick={() => handleCopy(txResult.txId)}><Copy className="w-4 h-4" /></Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">From</Label>
+                  <code className="block p-2 bg-muted rounded text-xs break-all">{txResult.from}</code>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">To</Label>
+                  <code className="block p-2 bg-muted rounded text-xs break-all">{txResult.to}</code>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Amount</Label>
+                  <div className="p-2 bg-muted rounded text-sm font-semibold">{txResult.amount} ALGO</div>
+                </div>
+                <a href={`https://testnet.algoexplorer.io/tx/${txResult.txId}`} target="_blank" rel="noopener noreferrer" className="block">
+                  <Button variant="outline" className="w-full" size="sm"><ExternalLink className="w-4 h-4 mr-2" />View on AlgoExplorer</Button>
+                </a>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Transaction Result</CardTitle>
+                <CardDescription>Transaction details will appear here after submission</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <div className="text-center space-y-2">
+                    <Send className="w-12 h-12 mx-auto opacity-20" />
+                    <p className="text-sm">No transaction yet</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-            {/* Submit Button */}
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Sending...' : 'Send Transaction'}
-              </button>
-            </div>
-          </div>
-        </form>
+          <Card className="border-l-4 border-l-yellow-500">
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" />Security Notice</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-2">
+              <p>• This is TestNet only. Never use your mainnet private keys or mnemonic.</p>
+              <p>• Get free TestNet ALGO from the <a href="https://bank.testnet.algorand.network/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">TestNet Dispenser</a></p>
+              <p>• Transactions typically confirm within 4-5 seconds.</p>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

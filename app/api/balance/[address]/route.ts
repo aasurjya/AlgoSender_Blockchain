@@ -4,10 +4,10 @@ import algosdk from 'algosdk';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { address: string } }
+  { params }: { params: Promise<{ address: string }> }
 ) {
   try {
-    const address = params.address;
+    const { address } = await params;
 
     if (!address || !algosdk.isValidAddress(address)) {
       return NextResponse.json(

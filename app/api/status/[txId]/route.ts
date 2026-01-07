@@ -4,10 +4,10 @@ import { checkTransactionStatus } from '@/lib/algorand';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { txId: string } }
+  { params }: { params: Promise<{ txId: string }> }
 ) {
   try {
-    const txId = params.txId;
+    const { txId } = await params;
 
     if (!txId) {
       return NextResponse.json(

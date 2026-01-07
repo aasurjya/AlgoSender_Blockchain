@@ -1,19 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { WalletProvider } from "@/contexts/WalletContext";
+import { Toaster } from "@/components/ui/toaster";
+import Layout from "@/components/Layout";
 
 export const metadata: Metadata = {
-  title: "AlgoSender | Algorand TestNet Transaction App",
+  title: "AlgoSender - Algorand Transaction Manager",
   description: "Send and track Algorand TestNet transactions with ease",
 };
 
@@ -23,11 +16,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider defaultTheme="dark" storageKey="algosender-theme">
+          <WalletProvider>
+            <Layout>
+              {children}
+            </Layout>
+            <Toaster />
+          </WalletProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
