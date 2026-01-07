@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase, Transaction } from '@/lib/mongodb';
+import { checkTransactionStatus } from '@/lib/algorand';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +24,31 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .skip(skip)
       .lean();
+
+    // Update pending transactions in background (don't await all)
+    const pendingTxs = transactions.filter((tx: any) => tx.status === 'pending');
+    if (pendingTxs.length > 0) {
+      // Update up to 5 pending transactions
+      const toUpdate = pendingTxs.slice(0, 5);
+      await Promise.all(
+        toUpdate.map(async (tx: any) => {
+          try {
+            const statusResult = await checkTransactionStatus(tx.txId);
+            if (statusResult.status !== 'pending') {
+              await Transaction.findOneAndUpdate(
+                { txId: tx.txId },
+                { status: statusResult.status, confirmedRound: statusResult.confirmedRound }
+              );
+              // Update the transaction object for response
+              tx.status = statusResult.status;
+              tx.confirmedRound = statusResult.confirmedRound;
+            }
+          } catch (e) {
+            // Ignore errors for individual status checks
+          }
+        })
+      );
+    }
 
     const total = await Transaction.countDocuments(queryFilter);
 
