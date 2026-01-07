@@ -41,8 +41,9 @@ export async function sendTransaction(params: {
 
   const signedTxn = txn.signTxn(senderAccount.sk);
   const response = await algodClient.sendRawTransaction(signedTxn).do();
-  // AlgoSDK response typing issue - the response contains txId
-  const txId = (response as any).txId;
+  
+  // AlgoSDK v3 returns txid (lowercase) or txId - handle both
+  const txId = (response as any).txid || (response as any).txId || txn.txID();
 
   return {
     txId,
