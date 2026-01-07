@@ -27,7 +27,28 @@ export async function POST(request: NextRequest) {
     // Connect to database
     await connectToDatabase();
 
-    // Save to DB
+    // Wait for transaction confirmation (up to 10 seconds)
+    let finalStatus = 'pending';
+    let confirmedRound = null;
+    
+    for (let i = 0; i < 5; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        const statusResult = await checkTransactionStatus(result.txId);
+        if (statusResult.status === 'confirmed') {
+          finalStatus = 'confirmed';
+          confirmedRound = statusResult.confirmedRound;
+          break;
+        } else if (statusResult.status === 'failed') {
+          finalStatus = 'failed';
+          break;
+        }
+      } catch (e) {
+        // Continue waiting
+      }
+    }
+
+    // Save to DB with final status
     try {
       const transaction = new Transaction({
         txId: result.txId,
@@ -35,16 +56,14 @@ export async function POST(request: NextRequest) {
         to: result.to,
         amount: result.amount,
         note: result.note,
-        status: 'pending',
+        status: finalStatus,
+        confirmedRound: confirmedRound,
       });
 
       await transaction.save();
     } catch (dbError: any) {
       console.error('Failed to save transaction:', dbError.message);
     }
-
-    // Update status asynchronously
-    updateTransactionStatus(result.txId);
 
     return NextResponse.json({
       success: true,
@@ -54,8 +73,10 @@ export async function POST(request: NextRequest) {
         to: result.to,
         amount: result.amount,
         note: result.note,
+        status: finalStatus,
+        confirmedRound: confirmedRound,
       },
-      message: 'Transaction sent successfully',
+      message: finalStatus === 'confirmed' ? 'Transaction confirmed!' : 'Transaction sent',
     });
   } catch (error: any) {
     console.error('Send transaction error:', error.message);
@@ -66,26 +87,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  }
-}
-
-// Helper function to update transaction status asynchronously
-async function updateTransactionStatus(txId: string) {
-  try {
-    // Wait a bit for transaction to be processed
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    
-    const status = await checkTransactionStatus(txId);
-    
-    await connectToDatabase();
-    await Transaction.findOneAndUpdate(
-      { txId },
-      {
-        status: status.status,
-        confirmedRound: status.confirmedRound,
-      }
-    );
-  } catch (error: any) {
-    console.error('Error updating transaction status:', error.message);
   }
 }
