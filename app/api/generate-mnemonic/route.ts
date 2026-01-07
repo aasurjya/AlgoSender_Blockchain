@@ -10,7 +10,7 @@ export async function GET() {
       success: true,
       data: {
         mnemonic,
-        address: account.addr,
+        address: account.addr.toString(),
       },
     });
   } catch (error: any) {

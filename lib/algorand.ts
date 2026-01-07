@@ -32,8 +32,8 @@ export async function sendTransaction(params: {
   const suggestedParams = await algodClient.getTransactionParams().do();
 
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: senderAccount.addr,
-    to: recipientAddress,
+    sender: senderAccount.addr,
+    receiver: recipientAddress,
     amount: algosdk.algosToMicroalgos(amount),
     note: note ? new Uint8Array(Buffer.from(note)) : undefined,
     suggestedParams
@@ -46,7 +46,7 @@ export async function sendTransaction(params: {
 
   return {
     txId,
-    from: senderAccount.addr,
+    from: senderAccount.addr.toString(),
     to: recipientAddress,
     amount,
     note,

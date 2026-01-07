@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          address: account.addr,
+          address: account.addr.toString(),
         },
       });
     } catch (error) {
