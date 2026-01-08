@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         const statusResult = await checkTransactionStatus(result.txId);
-        console.log(`Status check ${i+1}: ${statusResult.status} for tx ${result.txId}`);
         if (statusResult.status === 'confirmed') {
           finalStatus = 'confirmed';
           confirmedRound = statusResult.confirmedRound;
@@ -45,7 +44,6 @@ export async function POST(request: NextRequest) {
           break;
         }
       } catch (e) {
-        console.log(`Status check error ${i+1}:`, e);
         // Continue waiting
       }
     }

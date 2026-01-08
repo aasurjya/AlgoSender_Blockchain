@@ -28,14 +28,12 @@ export async function GET(request: NextRequest) {
     // Update pending transactions in background (don't await all)
     const pendingTxs = transactions.filter((tx: any) => tx.status === 'pending');
     if (pendingTxs.length > 0) {
-      console.log(`Found ${pendingTxs.length} pending transactions to check`);
       // Update up to 5 pending transactions
       const toUpdate = pendingTxs.slice(0, 5);
       await Promise.all(
         toUpdate.map(async (tx: any) => {
           try {
             const statusResult = await checkTransactionStatus(tx.txId);
-            console.log(`Transaction ${tx.txId} status: ${statusResult.status}`);
             if (statusResult.status !== 'pending') {
               await Transaction.findOneAndUpdate(
                 { txId: tx.txId },
@@ -46,7 +44,7 @@ export async function GET(request: NextRequest) {
               tx.confirmedRound = statusResult.confirmedRound ? Number(statusResult.confirmedRound) : null;
             }
           } catch (e) {
-            console.log(`Error checking transaction ${tx.txId}:`, e);
+            // Ignore errors for individual status checks
           }
         })
       );

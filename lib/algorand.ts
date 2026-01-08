@@ -62,7 +62,6 @@ export async function checkTransactionStatus(txId: string) {
     // First try the indexer (most reliable for confirmed transactions)
     const txnInfo = await indexerClient.lookupTransactionByID(txId).do();
     if (txnInfo.transaction) {
-      console.log(`Indexer status check: confirmed for tx ${txId}`);
       return {
         txId,
         status: 'confirmed',
@@ -70,14 +69,12 @@ export async function checkTransactionStatus(txId: string) {
       };
     }
   } catch (indexerError) {
-    console.log(`Indexer status check error: ${indexerError}`);
     // If indexer doesn't find it, try algod for pending status
     try {
       const pendingInfo = await algodClient.pendingTransactionInformation(txId).do();
       
       // Check if transaction is confirmed
       if (pendingInfo.confirmedRound && pendingInfo.confirmedRound > 0) {
-        console.log(`Algod status check: confirmed for tx ${txId}`);
         return {
           txId,
           status: 'confirmed',
@@ -87,7 +84,6 @@ export async function checkTransactionStatus(txId: string) {
 
       // Check for pool error
       if (pendingInfo.poolError && pendingInfo.poolError.length > 0) {
-        console.log(`Algod status check: failed for tx ${txId}`);
         return {
           txId,
           status: 'failed',
@@ -96,10 +92,8 @@ export async function checkTransactionStatus(txId: string) {
       }
 
       // Transaction is still pending
-      console.log(`Algod status check: pending for tx ${txId}`);
       return { txId, status: 'pending' };
     } catch (algodError: any) {
-      console.log(`Algod status check error: ${algodError}`);
       // If both fail, transaction likely failed or doesn't exist
       return {
         txId,
@@ -110,7 +104,6 @@ export async function checkTransactionStatus(txId: string) {
   }
 
   // Shouldn't reach here, but default to pending
-  console.log(`Default status check: pending for tx ${txId}`);
   return { txId, status: 'pending' };
 }
 
