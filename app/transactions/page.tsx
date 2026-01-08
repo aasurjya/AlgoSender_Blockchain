@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { History, ExternalLink, RefreshCw, Filter, CheckCircle, Clock, XCircle, ArrowUpRight } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { motion, AnimatePresence } from 'framer-motion';
+import { History, ExternalLink, RefreshCw, Filter, CheckCircle, Clock, XCircle, ArrowUpRight, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { algorandApi, type Transaction } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { formatAddress, formatDate } from '@/lib/utils';
@@ -13,6 +14,8 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'confirmed' | 'pending' | 'failed'>('all');
+  const [search, setSearch] = useState('');
+  const [expandedTx, setExpandedTx] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => { fetchTransactions(); }, [filter]);
@@ -25,6 +28,17 @@ export default function Transactions() {
     } catch (error: any) {
       toast({ title: 'Error', description: error.response?.data?.message || 'Failed to fetch', variant: 'destructive' });
     } finally { setLoading(false); }
+  };
+
+  const filteredTransactions = transactions.filter(tx => 
+    tx.txId.toLowerCase().includes(search.toLowerCase()) ||
+    tx.from.toLowerCase().includes(search.toLowerCase()) ||
+    tx.to.toLowerCase().includes(search.toLowerCase()) ||
+    (tx.note && tx.note.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const toggleExpand = (id: string) => {
+    setExpandedTx(expandedTx === id ? null : id);
   };
 
   const getStatusConfig = (status: string) => {
@@ -56,7 +70,7 @@ export default function Transactions() {
             <History className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Transaction History</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Transaction History</h1>
             <p className="text-muted-foreground">View all TestNet transactions</p>
           </div>
         </div>
@@ -65,8 +79,8 @@ export default function Transactions() {
         </Button>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <Card className="glass-card">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="glass-card md:col-span-1">
           <CardHeader className="pb-4">
             <CardTitle className="text-sm flex items-center gap-2"><Filter className="w-4 h-4" />Filter by Status</CardTitle>
           </CardHeader>
@@ -86,21 +100,37 @@ export default function Transactions() {
             </div>
           </CardContent>
         </Card>
+        
+        <Card className="glass-card md:col-span-2">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm flex items-center gap-2"><Search className="w-4 h-4" />Search Transactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by ID, Address, or Note..." 
+                className="pl-10 glass-premium"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-4">
         {loading ? (
-          <Card className="glass-card">
-            <CardContent className="py-16">
-              <div className="flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
-                  <RefreshCw className="w-8 h-8 text-white animate-spin" />
-                </div>
-                <p className="text-muted-foreground">Loading transactions...</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : transactions.length === 0 ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} className="glass-card animate-pulse">
+                <CardContent className="p-6">
+                  <div className="h-20 bg-muted/20 rounded-xl" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredTransactions.length === 0 ? (
           <Card className="glass-card">
             <CardContent className="py-16">
               <div className="text-center text-muted-foreground">
@@ -108,62 +138,105 @@ export default function Transactions() {
                   <History className="w-10 h-10 opacity-30" />
                 </div>
                 <p className="text-lg font-medium">No transactions found</p>
-                <p className="text-sm mt-2">{filter !== 'all' ? 'Try changing the filter or ' : ''}Send your first transaction to get started</p>
+                <p className="text-sm mt-2">{search ? 'Try a different search term or ' : ''}{filter !== 'all' ? 'change the filter' : 'send your first transaction'}</p>
               </div>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4">
-            {transactions.map((tx, index) => {
+            {filteredTransactions.map((tx, index) => {
               const statusConfig = getStatusConfig(tx.status);
               const StatusIcon = statusConfig.icon;
+              const isExpanded = expandedTx === tx._id;
+              
               return (
                 <motion.div key={tx._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
-                  <Card className="glass-card group overflow-hidden">
+                  <Card className={`glass-card group overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-primary/20 shadow-xl' : 'hover:shadow-lg'}`}>
                     <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${statusConfig.gradient} opacity-5 rounded-full blur-2xl group-hover:opacity-10 transition-opacity`} />
-                    <CardContent className="p-6">
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <CardContent className="p-0">
+                      <div 
+                        className="p-6 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                        onClick={() => toggleExpand(tx._id)}
+                      >
                         <div className="flex-1 space-y-3">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                              <p className="font-mono text-sm break-all">{tx.txId}</p>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Transaction ID</p>
+                              <p className="font-mono text-sm break-all font-semibold">{tx.txId}</p>
                             </div>
-                            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.color} border ${statusConfig.border}`}>
-                              <StatusIcon className="w-3.5 h-3.5" />{tx.status}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">From</p>
-                              <code className="text-sm font-mono">{formatAddress(tx.from)}</code>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">To</p>
-                              <code className="text-sm font-mono">{formatAddress(tx.to)}</code>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">Amount</p>
-                              <p className={`text-sm font-bold bg-gradient-to-r ${statusConfig.gradient} bg-clip-text text-transparent`}>{tx.amount} ALGO</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">Date</p>
-                              <p className="text-sm">{formatDate(tx.createdAt)}</p>
+                            <div className="flex items-center gap-3">
+                              <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusConfig.bg} ${statusConfig.color} border ${statusConfig.border} shadow-sm`}>
+                                <StatusIcon className="w-3.5 h-3.5" />{tx.status}
+                              </span>
+                              {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                             </div>
                           </div>
-                          {tx.note && (
-                            <div className="pt-2">
-                              <p className="text-xs text-muted-foreground mb-1">Note</p>
-                              <p className="text-sm bg-muted/50 p-2 rounded-lg">{tx.note}</p>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Amount</p>
+                              <p className={`text-lg font-black bg-gradient-to-r ${statusConfig.gradient} bg-clip-text text-transparent`}>{tx.amount} ALGO</p>
                             </div>
-                          )}
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Date</p>
+                              <p className="text-sm font-semibold">{formatDate(tx.createdAt)}</p>
+                            </div>
+                            <div className="hidden md:block">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">From</p>
+                              <code className="text-xs font-mono font-medium">{formatAddress(tx.from)}</code>
+                            </div>
+                            <div className="hidden md:block">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">To</p>
+                              <code className="text-xs font-mono font-medium">{formatAddress(tx.to)}</code>
+                            </div>
+                          </div>
                         </div>
-                        <a href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="glass-premium whitespace-nowrap">
-                            <ArrowUpRight className="w-4 h-4 mr-1" />Explorer
-                          </Button>
-                        </a>
                       </div>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-6 pb-6 pt-2 border-t border-white/10 bg-black/5 dark:bg-white/5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Full Sender Address</p>
+                                    <div className="flex items-center gap-2">
+                                      <code className="text-xs font-mono bg-muted/50 p-2 rounded-lg flex-1 break-all">{tx.from}</code>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Full Recipient Address</p>
+                                    <div className="flex items-center gap-2">
+                                      <code className="text-xs font-mono bg-muted/50 p-2 rounded-lg flex-1 break-all">{tx.to}</code>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Note / Metadata</p>
+                                    <p className="text-sm bg-muted/50 p-3 rounded-xl italic text-muted-foreground">
+                                      {tx.note || "No note attached to this transaction."}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-3">
+                                    <a href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                                      <Button className="w-full gradient-apple-blue border-0 shadow-lg text-white font-bold">
+                                        <ExternalLink className="w-4 h-4 mr-2" />View on AlgoExplorer
+                                      </Button>
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </CardContent>
                   </Card>
                 </motion.div>

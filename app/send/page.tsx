@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Copy, ExternalLink, Loader2, AlertCircle, Lock, Sparkles, Zap } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Send, Copy, ExternalLink, Loader2, AlertCircle, Lock, Sparkles, Zap, User, Clock as ClockIcon, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { algorandApi } from '@/lib/api';
-import { copyToClipboard } from '@/lib/utils';
+import { algorandApi, type Transaction } from '@/lib/api';
+import { copyToClipboard, formatAddress } from '@/lib/utils';
 import { useWallet } from '@/contexts/WalletContext';
 
 export default function SendTransaction() {
@@ -23,6 +23,7 @@ export default function SendTransaction() {
   const [balance, setBalance] = useState<number | null>(null);
   const [showReauthPrompt, setShowReauthPrompt] = useState(false);
   const [reauthMnemonic, setReauthMnemonic] = useState('');
+  const [recentRecipients, setRecentRecipients] = useState<string[]>([]);
   const { toast } = useToast();
 
   const needsReauth = isLoggedIn && !walletMnemonic;
@@ -31,8 +32,24 @@ export default function SendTransaction() {
     if (isLoggedIn && walletAddress) {
       setSenderAddress(walletAddress);
       handleCheckBalance(walletAddress);
+      fetchRecentRecipients();
     }
   }, [isLoggedIn, walletAddress]);
+
+  const fetchRecentRecipients = async () => {
+    try {
+      const res = await algorandApi.getAllTransactions({ limit: 50 });
+      if (res?.success) {
+        const recipients = res.data.transactions
+          .map((tx: Transaction) => tx.to)
+          .filter((addr: string, index: number, self: string[]) => self.indexOf(addr) === index)
+          .slice(0, 5);
+        setRecentRecipients(recipients);
+      }
+    } catch (e) {
+      console.error('Failed to fetch recent recipients', e);
+    }
+  };
 
   useEffect(() => {
     const deriveAddress = async () => {
@@ -129,13 +146,18 @@ export default function SendTransaction() {
         <div className="absolute bottom-1/4 left-1/3 w-72 h-72 bg-gradient-to-br from-purple-400/15 to-pink-500/15 rounded-full blur-3xl" />
       </div>
 
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ duration: 0.5 }}
+        className="flex items-center gap-3"
+      >
         <div className="p-3 gradient-apple-blue rounded-2xl shadow-lg">
           <Send className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Send ALGO</h1>
-          <p className="text-muted-foreground">Transfer tokens on TestNet</p>
+          <h1 className="text-3xl font-bold tracking-tight">Send ALGO</h1>
+          <p className="text-muted-foreground font-medium">Transfer tokens on TestNet with speed</p>
         </div>
       </motion.div>
 
@@ -196,23 +218,87 @@ export default function SendTransaction() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="recipient">Recipient Address <span className="text-destructive">*</span></Label>
-                  <Input id="recipient" placeholder="ALGO address (58 chars)" value={formData.recipientAddress} onChange={(e) => setFormData({ ...formData, recipientAddress: e.target.value })} className="font-mono" />
+                <div className="space-y-3">
+                  <Label htmlFor="recipient" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Recipient Address <span className="text-destructive">*</span></Label>
+                  <Input 
+                    id="recipient" 
+                    placeholder="ALGO address (58 chars)" 
+                    value={formData.recipientAddress} 
+                    onChange={(e) => setFormData({ ...formData, recipientAddress: e.target.value })} 
+                    className="font-mono glass-premium rounded-xl h-12" 
+                  />
+                  
+                  {isLoggedIn && recentRecipients.length > 0 && (
+                    <div className="space-y-2.5 px-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 flex items-center gap-1.5">
+                        <ClockIcon className="w-3 h-3" />
+                        Quick Select
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {recentRecipients.map((addr) => (
+                          <motion.button
+                            key={addr}
+                            whileHover={{ scale: 1.05, backgroundColor: 'rgba(var(--primary), 0.1)' }}
+                            whileTap={{ scale: 0.95 }}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, recipientAddress: addr })}
+                            className="px-3 py-1.5 rounded-full glass-premium text-[10px] font-mono hover:text-primary transition-all border border-white/10 flex items-center gap-1.5"
+                          >
+                            <User className="w-3 h-3 opacity-50" />
+                            {formatAddress(addr)}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (ALGO) <span className="text-destructive">*</span></Label>
-                  <Input id="amount" type="number" step="0.000001" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+                <div className="space-y-3">
+                  <Label htmlFor="amount" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount (ALGO) <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <Input 
+                      id="amount" 
+                      type="number" 
+                      step="0.000001" 
+                      placeholder="0.00" 
+                      value={formData.amount} 
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })} 
+                      className="glass-premium rounded-xl h-12 pr-16"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
+                      ALGO
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="note">Note (Optional)</Label>
-                  <Input id="note" placeholder="Add a note..." value={formData.note} onChange={(e) => setFormData({ ...formData, note: e.target.value })} maxLength={1000} />
+                <div className="space-y-3">
+                  <Label htmlFor="note" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Note (Optional)</Label>
+                  <Textarea 
+                    id="note" 
+                    placeholder="Add a public note to this transaction..." 
+                    value={formData.note} 
+                    onChange={(e) => setFormData({ ...formData, note: e.target.value })} 
+                    maxLength={1000}
+                    className="glass-premium rounded-xl min-h-[100px] resize-none p-4"
+                  />
                 </div>
 
-                <Button type="submit" className="w-full h-12 text-lg gradient-vibrant border-0 text-white shadow-lg hover:shadow-xl transition-shadow" disabled={loading}>
-                  {loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Sending...</> : <><Send className="w-5 h-5 mr-2" />Send ALGO</>}
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 text-lg font-black uppercase tracking-widest gradient-vibrant border-0 text-white shadow-xl shadow-purple-500/20 hover:shadow-purple-500/30 transition-all active:scale-[0.98]" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Processing...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-5 h-5 fill-current" />
+                      <span>Dispatch ALGO</span>
+                    </div>
+                  )}
                 </Button>
               </form>
             </CardContent>

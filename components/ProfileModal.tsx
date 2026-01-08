@@ -7,8 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useWallet } from '@/contexts/WalletContext';
-import { Copy, LogOut, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Copy, LogOut, Loader2, ShieldCheck, AlertTriangle, Key, Wallet as WalletIcon } from 'lucide-react';
 import { copyToClipboard } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProfileModalProps {
   open: boolean;
@@ -72,116 +73,159 @@ export default function ProfileModal({ open, onOpenChange }: ProfileModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {isLoggedIn ? (
-              <>
-                <ShieldCheck className="w-5 h-5 text-green-500" />
-                My Wallet
-              </>
-            ) : (
-              'Login with Mnemonic'
-            )}
-          </DialogTitle>
-          <DialogDescription>
-            {isLoggedIn
-              ? 'Your wallet is connected and ready to use'
-              : 'Enter your Algorand mnemonic to access your wallet'}
-          </DialogDescription>
-        </DialogHeader>
-
-        {isLoggedIn ? (
-          <div className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">Wallet Address:</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopyAddress}
-                  className="h-8"
-                >
-                  <Copy className="w-4 h-4 mr-1" />
-                  Copy
-                </Button>
-              </div>
-              <p className="font-mono text-xs break-all bg-background p-2 rounded">
-                {address}
-              </p>
-              <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span>Active wallet loaded</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div className="space-y-1 text-xs">
-                  <p className="font-semibold text-blue-900 dark:text-blue-100">Security Notes:</p>
-                  <ul className="space-y-1 text-blue-800 dark:text-blue-200">
-                    <li>✓ Your mnemonic stays in browser memory</li>
-                    <li>✓ Never saved or uploaded to servers</li>
-                    <li>✓ Never stored in any database</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="mnemonic">Mnemonic Phrase (25 words)</Label>
-              <Textarea
-                id="mnemonic"
-                placeholder="Enter your 25-word mnemonic phrase..."
-                value={mnemonic}
-                onChange={(e) => setMnemonic(e.target.value)}
-                rows={4}
-                className="font-mono text-sm"
-              />
-            </div>
-
-            <div className="space-y-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5" />
-                <div className="space-y-1 text-xs">
-                  <p className="font-semibold text-amber-900 dark:text-amber-100">Important:</p>
-                  <ul className="space-y-1 text-amber-800 dark:text-amber-200">
-                    <li>⚠️ Your mnemonic never leaves your browser</li>
-                    <li>⚠️ It is not sent to the server</li>
-                    <li>⚠️ TestNet use only — never paste MainNet mnemonic</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={handleLogin}
-              disabled={loading || !mnemonic.trim()}
-            >
-              {loading ? (
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-0 glass-premium shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 pointer-events-none" />
+        
+        <div className="relative p-6 space-y-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+              {isLoggedIn ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Logging in...
+                  <div className="p-2 bg-emerald-500/20 rounded-xl">
+                    <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  Account Profile
                 </>
               ) : (
-                'Login'
+                <>
+                  <div className="p-2 bg-blue-500/20 rounded-xl">
+                    <Key className="w-6 h-6 text-blue-500" />
+                  </div>
+                  Secure Access
+                </>
               )}
-            </Button>
-          </div>
-        )}
+            </DialogTitle>
+            <DialogDescription className="text-base font-medium opacity-80">
+              {isLoggedIn
+                ? 'Manage your connected Algorand wallet'
+                : 'Enter your mnemonic phrase to securely load your wallet'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <AnimatePresence mode="wait">
+            {isLoggedIn ? (
+              <motion.div 
+                key="logged-in"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="p-5 glass-card rounded-[1.5rem] space-y-4 border border-white/10 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <WalletIcon className="w-24 h-24" />
+                  </div>
+                  
+                  <div className="flex items-center justify-between relative z-10">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Active Address</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyAddress}
+                      className="h-7 px-3 text-[10px] font-bold uppercase tracking-wider hover:bg-primary/10 rounded-full"
+                    >
+                      <Copy className="w-3 h-3 mr-1.5" />
+                      Copy Address
+                    </Button>
+                  </div>
+                  <p className="font-mono text-sm break-all bg-black/20 dark:bg-white/5 p-4 rounded-xl border border-white/5 font-semibold text-primary/90">
+                    {address}
+                  </p>
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-emerald-500">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                    <span className="uppercase tracking-wide">Ready for TestNet Transactions</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/20">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-blue-500 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight">Security Protocol</p>
+                      <ul className="space-y-1.5 text-xs font-medium text-muted-foreground leading-relaxed">
+                        <li className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-blue-400 rounded-full" />
+                          Keys stay exclusively in local memory
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-blue-400 rounded-full" />
+                          Encrypted transmission to Algorand nodes
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-blue-400 rounded-full" />
+                          Automatic session cleanup on close
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  variant="destructive"
+                  className="w-full h-12 rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition-all border-0"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Disconnect Wallet
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="logged-out"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="space-y-6"
+              >
+                <div className="space-y-3">
+                  <Label htmlFor="mnemonic" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Mnemonic Phrase (25 words)</Label>
+                  <Textarea
+                    id="mnemonic"
+                    placeholder="word1 word2 word3..."
+                    value={mnemonic}
+                    onChange={(e) => setMnemonic(e.target.value)}
+                    rows={4}
+                    className="font-mono text-sm glass-premium rounded-2xl p-4 border-white/10 focus:ring-primary/20 resize-none"
+                  />
+                </div>
+
+                <div className="space-y-3 p-4 bg-amber-500/5 rounded-2xl border border-amber-500/20">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight">Warning Advisory</p>
+                      <ul className="space-y-1.5 text-xs font-medium text-muted-foreground leading-relaxed">
+                        <li className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-amber-400 rounded-full" />
+                          Never use your MainNet mnemonic here
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-amber-400 rounded-full" />
+                          This is a TestNet-only environment
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full h-14 rounded-2xl text-base font-black uppercase tracking-widest gradient-apple-blue border-0 shadow-xl shadow-blue-500/20 hover:shadow-blue-500/30 transition-all text-white disabled:opacity-50"
+                  onClick={handleLogin}
+                  disabled={loading || !mnemonic.trim()}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    'Connect Securely'
+                  )}
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </DialogContent>
     </Dialog>
   );
