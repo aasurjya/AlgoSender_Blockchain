@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         amount: result.amount,
         note: result.note,
         status: finalStatus,
-        confirmedRound: confirmedRound,
+        confirmedRound: confirmedRound ? Number(confirmedRound) : null,
       });
 
       await transaction.save();
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         amount: result.amount,
         note: result.note,
         status: finalStatus,
-        confirmedRound: confirmedRound,
+        confirmedRound: confirmedRound ? Number(confirmedRound) : null,
       },
       message: finalStatus === 'confirmed' ? 'Transaction confirmed!' : 'Transaction sent',
     });

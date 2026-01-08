@@ -39,11 +39,11 @@ export async function GET(request: NextRequest) {
             if (statusResult.status !== 'pending') {
               await Transaction.findOneAndUpdate(
                 { txId: tx.txId },
-                { status: statusResult.status, confirmedRound: statusResult.confirmedRound }
+                { status: statusResult.status, confirmedRound: statusResult.confirmedRound ? Number(statusResult.confirmedRound) : null }
               );
               // Update the transaction object for response
               tx.status = statusResult.status;
-              tx.confirmedRound = statusResult.confirmedRound;
+              tx.confirmedRound = statusResult.confirmedRound ? Number(statusResult.confirmedRound) : null;
             }
           } catch (e) {
             console.log(`Error checking transaction ${tx.txId}:`, e);
