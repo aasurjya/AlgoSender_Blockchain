@@ -59,45 +59,59 @@ export async function sendTransaction(params: {
  */
 export async function checkTransactionStatus(txId: string) {
   try {
-    const pendingInfo = await algodClient.pendingTransactionInformation(txId).do();
-
-    if (pendingInfo.confirmedRound && pendingInfo.confirmedRound > 0) {
+    // First try the indexer (most reliable for confirmed transactions)
+    const txnInfo = await indexerClient.lookupTransactionByID(txId).do();
+    if (txnInfo.transaction) {
+      console.log(`Indexer status check: confirmed for tx ${txId}`);
       return {
         txId,
         status: 'confirmed',
-        confirmedRound: pendingInfo.confirmedRound,
+        confirmedRound: txnInfo.transaction.confirmedRound,
       };
     }
-
-    if (pendingInfo.poolError && pendingInfo.poolError.length > 0) {
-      return {
-        txId,
-        status: 'failed',
-        poolError: pendingInfo.poolError,
-      };
-    }
-
-    return { txId, status: 'pending' };
-  } catch (error: any) {
+  } catch (indexerError) {
+    console.log(`Indexer status check error: ${indexerError}`);
+    // If indexer doesn't find it, try algod for pending status
     try {
-      const txnInfo = await indexerClient.lookupTransactionByID(txId).do();
-      if (txnInfo.transaction) {
+      const pendingInfo = await algodClient.pendingTransactionInformation(txId).do();
+      
+      // Check if transaction is confirmed
+      if (pendingInfo.confirmedRound && pendingInfo.confirmedRound > 0) {
+        console.log(`Algod status check: confirmed for tx ${txId}`);
         return {
           txId,
           status: 'confirmed',
-          confirmedRound: txnInfo.transaction.confirmedRound,
+          confirmedRound: pendingInfo.confirmedRound,
         };
       }
-    } catch (indexerError) {
-      // ignore
-    }
 
-    return {
-      txId,
-      status: 'failed',
-      poolError: error.message || 'Transaction not found',
-    };
+      // Check for pool error
+      if (pendingInfo.poolError && pendingInfo.poolError.length > 0) {
+        console.log(`Algod status check: failed for tx ${txId}`);
+        return {
+          txId,
+          status: 'failed',
+          poolError: pendingInfo.poolError,
+        };
+      }
+
+      // Transaction is still pending
+      console.log(`Algod status check: pending for tx ${txId}`);
+      return { txId, status: 'pending' };
+    } catch (algodError: any) {
+      console.log(`Algod status check error: ${algodError}`);
+      // If both fail, transaction likely failed or doesn't exist
+      return {
+        txId,
+        status: 'failed',
+        poolError: algodError.message || 'Transaction not found',
+      };
+    }
   }
+
+  // Shouldn't reach here, but default to pending
+  console.log(`Default status check: pending for tx ${txId}`);
+  return { txId, status: 'pending' };
 }
 
 /**
