@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Send, Copy, ExternalLink, Loader2, AlertCircle, Lock, Sparkles, Zap, User, Clock as ClockIcon, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, Copy, ExternalLink, Loader2, AlertCircle, Lock, Sparkles, Zap, User, Clock as ClockIcon, CheckCircle2, Share2, ArrowLeft, Wallet } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ export default function SendTransaction() {
   const [showReauthPrompt, setShowReauthPrompt] = useState(false);
   const [reauthMnemonic, setReauthMnemonic] = useState('');
   const [recentRecipients, setRecentRecipients] = useState<string[]>([]);
+  const [showConfirm, setShowConfirm] = useState(false);
   const { toast } = useToast();
 
   const needsReauth = isLoggedIn && !walletMnemonic;
@@ -35,6 +37,20 @@ export default function SendTransaction() {
       fetchRecentRecipients();
     }
   }, [isLoggedIn, walletAddress]);
+
+  useEffect(() => {
+    const deriveAddress = async () => {
+      if (formData.mnemonic.trim() && !isLoggedIn) {
+        try {
+          const res = await algorandApi.deriveAddress(formData.mnemonic);
+          if (res?.success && res?.data?.address) {
+            setSenderAddress(res.data.address);
+          }
+        } catch { setSenderAddress(''); }
+      }
+    };
+    deriveAddress();
+  }, [formData.mnemonic, isLoggedIn]);
 
   const fetchRecentRecipients = async () => {
     try {
@@ -50,20 +66,6 @@ export default function SendTransaction() {
       console.error('Failed to fetch recent recipients', e);
     }
   };
-
-  useEffect(() => {
-    const deriveAddress = async () => {
-      if (formData.mnemonic.trim() && !isLoggedIn) {
-        try {
-          const res = await algorandApi.deriveAddress(formData.mnemonic);
-          if (res?.success && res?.data?.address) {
-            setSenderAddress(res.data.address);
-          }
-        } catch { setSenderAddress(''); }
-      }
-    };
-    deriveAddress();
-  }, [formData.mnemonic, isLoggedIn]);
 
   const handleGenerateMnemonic = async () => {
     try {
@@ -104,24 +106,39 @@ export default function SendTransaction() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateForm = () => {
     let mnemonicToUse = isLoggedIn ? walletMnemonic : formData.mnemonic;
-    if (isLoggedIn && !mnemonicToUse) { setShowReauthPrompt(true); return; }
+    if (isLoggedIn && !mnemonicToUse) { setShowReauthPrompt(true); return false; }
     if (!mnemonicToUse || !formData.recipientAddress || !formData.amount) {
       toast({ title: 'Validation Error', description: 'Please fill required fields', variant: 'destructive' });
-      return;
+      return false;
     }
     const recipientAddr = formData.recipientAddress.trim();
     if (recipientAddr.length !== 58) {
       toast({ title: 'Invalid Address', description: 'Must be 58 characters', variant: 'destructive' });
-      return;
+      return false;
     }
     const amount = parseFloat(formData.amount);
     if (isNaN(amount) || amount <= 0) {
       toast({ title: 'Invalid Amount', description: 'Must be positive', variant: 'destructive' });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleInitialSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      setShowConfirm(true);
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    setShowConfirm(false);
+    let mnemonicToUse = isLoggedIn ? walletMnemonic : formData.mnemonic;
+    const recipientAddr = formData.recipientAddress.trim();
+    const amount = parseFloat(formData.amount);
+
     setLoading(true);
     setTxResult(null);
     try {
@@ -138,6 +155,18 @@ export default function SendTransaction() {
   };
 
   const handleCopy = (text: string) => { copyToClipboard(text); toast({ title: 'Copied!' }); };
+
+  const handleShare = () => {
+    if (!txResult) return;
+    const url = `https://testnet.algoexplorer.io/tx/${txResult.txId}`;
+    copyToClipboard(url);
+    toast({ title: 'Link Copied', description: 'AlgoExplorer link copied to clipboard' });
+  };
+
+  const handleReset = () => {
+    setTxResult(null);
+    setFormData({ mnemonic: '', recipientAddress: '', amount: '', note: '' });
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
@@ -169,28 +198,58 @@ export default function SendTransaction() {
               <CardDescription>Enter the details to send ALGO</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleInitialSubmit} className="space-y-5">
                 {!isLoggedIn && (
                   <div className="space-y-3">
-                    <Label htmlFor="mnemonic">Sender Mnemonic <span className="text-destructive">*</span></Label>
-                    <div className="flex gap-2">
-                      <Textarea id="mnemonic" placeholder="Enter 25-word mnemonic..." value={formData.mnemonic} onChange={(e) => setFormData({ ...formData, mnemonic: e.target.value })} rows={3} className="font-mono text-sm flex-1" />
-                      <Button type="button" variant="outline" onClick={handleGenerateMnemonic} className="shrink-0">
-                        <Sparkles className="w-4 h-4 mr-1" />Generate
+                    <div className="flex items-center justify-between ml-1">
+                      <Label htmlFor="mnemonic" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Sender Mnemonic <span className="text-destructive">*</span></Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={handleGenerateMnemonic} className="h-6 text-[10px] font-black uppercase tracking-tighter text-primary hover:bg-primary/5">
+                        <Sparkles className="w-3 h-3 mr-1" /> New Wallet
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Never share your mainnet mnemonic. TestNet only!</p>
+                    <div className="flex flex-col gap-2">
+                      <Textarea 
+                        id="mnemonic" 
+                        placeholder="Enter 25-word mnemonic phrase..." 
+                        value={formData.mnemonic} 
+                        onChange={(e) => setFormData({ ...formData, mnemonic: e.target.value })} 
+                        rows={3} 
+                        className="font-mono text-sm glass-premium rounded-xl p-4 border-white/10 resize-none" 
+                      />
+                      {formData.mnemonic.trim() && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="self-end text-[10px] font-bold uppercase text-muted-foreground hover:text-primary"
+                          onClick={() => { copyToClipboard(formData.mnemonic); toast({ title: 'Copied!' }); }}
+                        >
+                          <Copy className="w-3 h-3 mr-1" /> Copy All
+                        </Button>
+                      )}
+                    </div>
                     {senderAddress && (
-                      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 space-y-3">
+                      <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-3 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                          <Wallet className="w-12 h-12" />
+                        </div>
                         <div>
-                          <Label className="text-xs font-semibold">Sender Address</Label>
-                          <p className="font-mono text-xs break-all mt-1">{senderAddress}</p>
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Derived Address</Label>
+                          <p className="font-mono text-xs break-all mt-1 font-semibold text-primary/80">{senderAddress}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleCheckBalance()} disabled={checkingBalance}>
+                          <Button type="button" variant="ghost" className="h-8 px-3 rounded-full bg-primary/10 text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all" onClick={() => handleCheckBalance()} disabled={checkingBalance}>
                             {checkingBalance ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Check Balance'}
                           </Button>
-                          {balance !== null && <span className="text-sm font-bold text-primary">{balance} ALGO</span>}
+                          {balance !== null && (
+                            <motion.span 
+                              initial={{ opacity: 0, x: -10 }} 
+                              animate={{ opacity: 1, x: 0 }} 
+                              className="text-xs font-black text-primary"
+                            >
+                              {balance.toFixed(2)} ALGO
+                            </motion.span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -204,15 +263,15 @@ export default function SendTransaction() {
                         <Lock className="w-5 h-5 text-white" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold">{needsReauth || showReauthPrompt ? 'Re-auth Required' : 'Wallet Connected'}</p>
+                        <p className="font-semibold text-sm">{needsReauth || showReauthPrompt ? 'Re-auth Required' : 'Wallet Connected'}</p>
                         <p className="text-xs font-mono break-all text-muted-foreground">{senderAddress}</p>
                       </div>
-                      {balance !== null && !needsReauth && <span className="text-lg font-bold text-primary">{balance} ALGO</span>}
+                      {balance !== null && !needsReauth && <span className="text-lg font-bold text-primary">{balance.toFixed(2)} <span className="text-[10px] opacity-60 uppercase">ALGO</span></span>}
                     </div>
                     {(needsReauth || showReauthPrompt) && (
                       <div className="mt-4 space-y-2">
-                        <Textarea placeholder="Enter mnemonic..." value={reauthMnemonic} onChange={(e) => setReauthMnemonic(e.target.value)} rows={2} className="font-mono text-sm" />
-                        <Button type="button" size="sm" onClick={handleReauth} className="w-full">Re-authenticate</Button>
+                        <Textarea placeholder="Enter mnemonic..." value={reauthMnemonic} onChange={(e) => setReauthMnemonic(e.target.value)} rows={2} className="font-mono text-sm glass-premium rounded-xl" />
+                        <Button type="button" size="sm" onClick={handleReauth} className="w-full gradient-apple-blue border-0 text-white rounded-xl h-10 font-bold uppercase tracking-wider text-xs">Re-authenticate</Button>
                       </div>
                     )}
                   </div>
@@ -306,45 +365,123 @@ export default function SendTransaction() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="lg:col-span-2 space-y-6">
-          {txResult ? (
-            <Card className="glass-card border-2 border-emerald-500/50 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5" />
-              <CardHeader>
-                <CardTitle className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><AlertCircle className="w-5 h-5" />Success!</CardTitle>
-                <CardDescription>Transaction broadcast to network</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 relative">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Transaction ID</Label>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 p-2 bg-muted/50 rounded-lg text-xs break-all">{txResult.txId}</code>
-                    <Button variant="outline" size="icon" onClick={() => handleCopy(txResult.txId)}><Copy className="w-4 h-4" /></Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold text-lg">{txResult.amount} ALGO</p></div>
-                  <div><span className="text-muted-foreground">Status</span><p className="font-bold text-emerald-500">Pending</p></div>
-                </div>
-                <a href={`https://testnet.algoexplorer.io/tx/${txResult.txId}`} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" className="w-full"><ExternalLink className="w-4 h-4 mr-2" />View on Explorer</Button>
-                </a>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="glass-card">
-              <CardHeader><CardTitle>Transaction Result</CardTitle><CardDescription>Details appear after sending</CardDescription></CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <div className="text-center space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
-                      <Send className="w-8 h-8 opacity-30" />
+          <AnimatePresence mode="wait">
+            {txResult ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                className="space-y-6"
+              >
+                <Card className="glass-card border-2 border-emerald-500/50 overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent pointer-events-none" />
+                  
+                  {/* Celebration Orbs */}
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.2, 1],
+                      opacity: [0.3, 0.5, 0.3]
+                    }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                    className="absolute top-[-10%] right-[-10%] w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"
+                  />
+
+                  <CardHeader className="text-center pb-2">
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', damping: 12, delay: 0.2 }}
+                      className="mx-auto w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-xl shadow-emerald-500/20"
+                    >
+                      <CheckCircle2 className="w-10 h-10 text-white" />
+                    </motion.div>
+                    <CardTitle className="text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">Transaction Sent!</CardTitle>
+                    <CardDescription className="text-base font-medium">Your assets are moving across the network</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="space-y-6 relative z-10">
+                    <div className="p-4 bg-black/20 dark:bg-white/5 rounded-2xl border border-white/10 space-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Transaction ID</Label>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 p-2 bg-black/20 rounded-lg text-[10px] font-mono break-all font-semibold opacity-80">{txResult.txId}</code>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 rounded-full" onClick={() => handleCopy(txResult.txId)}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Amount</p>
+                          <p className="text-2xl font-black tracking-tighter text-primary">{txResult.amount} <span className="text-xs opacity-60">ALGO</span></p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Status</p>
+                          <div className="flex items-center gap-2 text-emerald-500">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="text-lg font-bold uppercase tracking-tight">Broadcasted</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-sm">No transaction yet</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
+                    <div className="flex gap-3">
+                      <Button variant="outline" className="flex-1 glass-premium border-white/10 h-12 rounded-xl font-bold uppercase tracking-wider text-xs" onClick={handleShare}>
+                        <Share2 className="w-4 h-4 mr-2" /> Share Link
+                      </Button>
+                      <a href={`https://testnet.algoexplorer.io/tx/${txResult.txId}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                        <Button className="w-full gradient-apple-blue border-0 h-12 rounded-xl font-bold uppercase tracking-wider text-xs shadow-lg shadow-blue-500/20 text-white">
+                          <ExternalLink className="w-4 h-4 mr-2" /> Explorer
+                        </Button>
+                      </a>
+                    </div>
+                  </CardContent>
+
+                  <CardFooter className="bg-emerald-500/5 border-t border-emerald-500/10 p-4">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest text-xs hover:bg-emerald-500/10"
+                      onClick={handleReset}
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Send Another Transaction
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="placeholder"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold">Live Status</CardTitle>
+                    <CardDescription>Real-time transaction feedback</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center py-20 text-muted-foreground">
+                      <div className="text-center space-y-4">
+                        <div className="relative mx-auto w-20 h-20">
+                          <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping" />
+                          <div className="relative w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center border border-white/10">
+                            <Send className="w-10 h-10 opacity-20" />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-bold tracking-tight">Ready for Dispatch</p>
+                          <p className="text-xs opacity-60">Fill the form to begin transfer</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <Card className="glass-card border-l-4 border-l-yellow-500">
             <CardHeader><CardTitle className="text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" />Security</CardTitle></CardHeader>
@@ -356,6 +493,68 @@ export default function SendTransaction() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 glass-premium shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 pointer-events-none" />
+          
+          <div className="relative p-6 space-y-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+                <div className="p-2 bg-blue-500/20 rounded-xl">
+                  <AlertCircle className="w-6 h-6 text-blue-500" />
+                </div>
+                Verify Transaction
+              </DialogTitle>
+              <DialogDescription className="text-base font-medium opacity-80 pt-2">
+                Please double-check the recipient and amount before dispatching.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 p-5 glass-card border border-white/10 rounded-2xl relative overflow-hidden">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recipient</p>
+                  <p className="font-mono text-xs break-all font-semibold bg-black/20 p-2 rounded-lg">{formData.recipientAddress}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount</p>
+                    <p className="text-xl font-black tracking-tighter text-primary">{formData.amount} ALGO</p>
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Network Fee</p>
+                    <p className="text-sm font-bold text-muted-foreground">0.001 ALGO</p>
+                  </div>
+                </div>
+                {formData.note && (
+                  <div className="space-y-1 border-t border-white/5 pt-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Attached Note</p>
+                    <p className="text-xs font-medium italic opacity-70 truncate">{formData.note}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button 
+                className="w-full h-12 rounded-xl text-sm font-black uppercase tracking-widest gradient-vibrant border-0 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-all text-white"
+                onClick={handleConfirmSend}
+              >
+                Sign & Dispatch
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full h-10 rounded-xl text-xs font-bold uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity"
+                onClick={() => setShowConfirm(false)}
+              >
+                Cancel & Edit
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
