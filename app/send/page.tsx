@@ -168,7 +168,7 @@ export default function SendTransaction() {
 
   const handleShare = () => {
     if (!txResult) return;
-    const url = `https://explorer.perawallet.app/tx/${txResult.txId}/?network=testnet`;
+    const url = `https://testnet.explorer.perawallet.app/tx/${txResult.txId}/`;
     copyToClipboard(url);
     toast({ title: 'Link Copied', description: 'Pera Explorer link copied to clipboard' });
   };
@@ -489,7 +489,7 @@ export default function SendTransaction() {
                       <Button variant="outline" className="flex-1 glass-premium border-white/10 h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg" onClick={handleShare}>
                         <Share2 className="w-4 h-4 mr-2" /> Share Receipt
                       </Button>
-                      <a href={`https://explorer.perawallet.app/tx/${txResult.txId}/?network=testnet`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                      <a href={`https://testnet.explorer.perawallet.app/tx/${txResult.txId}/`} target="_blank" rel="noopener noreferrer" className="flex-1">
                         <Button className="w-full gradient-apple-blue border-0 h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-500/30 text-white">
                           <ExternalLink className="w-4 h-4 mr-2" /> Pera Explorer
                         </Button>
