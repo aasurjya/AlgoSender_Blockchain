@@ -1,45 +1,47 @@
 import mongoose from 'mongoose';
 
-// Global is used here to maintain a cached connection across hot reloads in development
-interface GlobalWithMongoose {
-  mongoose?: {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/algosender';
+
+/** 
+ * Global is used here to maintain a cached connection across hot reloads
+ * in development. This prevents connections from growing exponentially
+ * during API Route usage.
+ */
+let globalWithMongoose = global as typeof globalThis & {
+  mongoose: {
     conn: typeof mongoose | null;
     promise: Promise<typeof mongoose> | null;
   };
-}
+};
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/algosender';
-
-let cached = (global as unknown as GlobalWithMongoose).mongoose;
-
-if (!cached) {
-  cached = (global as unknown as GlobalWithMongoose).mongoose = { conn: null, promise: null };
+if (!globalWithMongoose.mongoose) {
+  globalWithMongoose.mongoose = { conn: null, promise: null };
 }
 
 export async function connectToDatabase() {
-  if (cached.conn) {
-    return cached.conn;
+  if (globalWithMongoose.mongoose.conn) {
+    return globalWithMongoose.mongoose.conn;
   }
 
-  if (!cached.promise) {
+  if (!globalWithMongoose.mongoose.promise) {
     const opts = {
       bufferCommands: true,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+    globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
       console.log('✅ MongoDB connected successfully');
-      return mongoose;
+      return mongooseInstance;
     });
   }
   
   try {
-    cached.conn = await cached.promise;
+    globalWithMongoose.mongoose.conn = await globalWithMongoose.mongoose.promise;
   } catch (e) {
-    cached.promise = null;
+    globalWithMongoose.mongoose.promise = null;
     throw e;
   }
 
-  return cached.conn;
+  return globalWithMongoose.mongoose.conn;
 }
 
 // Transaction Model

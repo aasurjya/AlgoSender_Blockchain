@@ -70,10 +70,10 @@ export default function Dashboard() {
       bg: 'bg-blue-500/10'
     },
     {
-      title: 'AlgoExplorer',
+      title: 'Pera Explorer',
       desc: 'View all transactions and network activity in real-time.',
       icon: Globe,
-      href: 'https://testnet.algoexplorer.io/',
+      href: 'https://explorer.perawallet.app/',
       color: 'text-purple-500',
       bg: 'bg-purple-500/10'
     },
@@ -313,7 +313,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right">
                         <p className="font-black text-base tracking-tighter">{tx.amount} ALGO</p>
-                        <Link href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" className="text-[10px] text-primary hover:underline flex items-center justify-end font-black uppercase tracking-widest">
+                        <Link href={`https://explorer.perawallet.app/tx/${tx.txId}/?network=testnet`} target="_blank" className="text-[10px] text-primary hover:underline flex items-center justify-end font-black uppercase tracking-widest">
                           Explorer <ArrowUpRight className="w-3 h-3 ml-0.5" />
                         </Link>
                       </div>

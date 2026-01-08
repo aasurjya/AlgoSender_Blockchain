@@ -225,9 +225,9 @@ export default function Transactions() {
                                     </p>
                                   </div>
                                   <div className="flex gap-3">
-                                    <a href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                                    <a href={`https://explorer.perawallet.app/tx/${tx.txId}/?network=testnet`} target="_blank" rel="noopener noreferrer" className="flex-1">
                                       <Button className="w-full gradient-apple-blue border-0 shadow-lg text-white font-bold">
-                                        <ExternalLink className="w-4 h-4 mr-2" />View on AlgoExplorer
+                                        <ExternalLink className="w-4 h-4 mr-2" />View on Pera Explorer
                                       </Button>
                                     </a>
                                   </div>

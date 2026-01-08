@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Skip Node.js version check during development
   skipTrailingSlashRedirect: true,
+  skipMiddlewareUrlNormalize: true,
   experimental: {
     serverMinification: false,
-    skipMiddlewareUrlNormalize: true,
-    skipTrailingSlashRedirect: true,
   },
 };
 
