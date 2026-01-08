@@ -1,13 +1,25 @@
 "use client"
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { TrendingUp, CheckCircle, Clock, XCircle, Wallet, Activity, History, Sparkles, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  TrendingUp, CheckCircle, Clock, XCircle, Wallet, Activity, 
+  History, Sparkles, ArrowRight, ArrowUpRight, ExternalLink, 
+  HelpCircle, Droplets, Globe, ChevronRight 
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { algorandApi, type Stats, type Transaction } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { formatAddress, formatDate } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -48,6 +60,33 @@ export default function Dashboard() {
     }
   };
 
+  const testnetResources = [
+    {
+      title: 'TestNet Faucet',
+      desc: 'Get free TestNet ALGO for testing your transactions.',
+      icon: Droplets,
+      href: 'https://bank.testnet.algorand.network/',
+      color: 'text-blue-500',
+      bg: 'bg-blue-500/10'
+    },
+    {
+      title: 'AlgoExplorer',
+      desc: 'View all transactions and network activity in real-time.',
+      icon: Globe,
+      href: 'https://testnet.algoexplorer.io/',
+      color: 'text-purple-500',
+      bg: 'bg-purple-500/10'
+    },
+    {
+      title: 'AlgoNode',
+      desc: 'Connect to fast, reliable Algorand APIs and infrastructure.',
+      icon: Activity,
+      href: 'https://algonode.io/',
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500/10'
+    }
+  ];
+
   const statCards = [
     { title: 'Total Transactions', value: stats?.total || 0, icon: TrendingUp, gradient: 'from-blue-500 via-indigo-500 to-purple-500' },
     { title: 'Confirmed', value: stats?.confirmed || 0, icon: CheckCircle, gradient: 'from-emerald-400 via-green-500 to-teal-500' },
@@ -62,7 +101,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8 relative">
+    <div className="space-y-8 relative pb-20">
       {/* Liquid Background Effects */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-purple-500/20 rounded-full blur-3xl animate-pulse" />
@@ -150,13 +189,13 @@ export default function Dashboard() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Card className="glass-card cursor-pointer group overflow-hidden">
+                <Card className="glass-card cursor-pointer group overflow-hidden h-full">
                   <CardHeader>
                     <div className={`w-14 h-14 ${card.gradient} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-lg`}>
                       <Icon className="w-7 h-7 text-white" />
                     </div>
-                    <CardTitle className="text-xl">{card.title}</CardTitle>
-                    <CardDescription className="text-base">{card.desc}</CardDescription>
+                    <CardTitle className="text-xl font-bold">{card.title}</CardTitle>
+                    <CardDescription className="text-base font-medium opacity-70">{card.desc}</CardDescription>
                   </CardHeader>
                 </Card>
               </motion.div>
@@ -186,18 +225,18 @@ export default function Dashboard() {
                 transition={{ delay: 0.3 + index * 0.1 }}
                 whileHover={{ scale: 1.03 }}
               >
-                <Card className="glass-card overflow-hidden group">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+                <Card className="glass-card overflow-hidden group border-0 shadow-lg">
+                  <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                      <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">{stat.title}</CardTitle>
+                      <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg shadow-black/5`}>
                         <Icon className="w-4 h-4 text-white" />
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl md:text-4xl font-bold">
+                    <div className="text-3xl md:text-4xl font-black tracking-tighter">
                       {loading ? (
                         <div className="h-10 w-16 bg-muted rounded-lg animate-pulse" />
                       ) : (
@@ -220,14 +259,14 @@ export default function Dashboard() {
           transition={{ delay: 0.4 }}
           className="lg:col-span-2"
         >
-          <Card className="glass-card h-full overflow-hidden">
+          <Card className="glass-card h-full overflow-hidden border-0 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
               <div>
-                <CardTitle className="text-2xl font-bold">Recent Activity</CardTitle>
-                <CardDescription>Latest transactions on the network</CardDescription>
+                <CardTitle className="text-2xl font-black tracking-tight">Recent Activity</CardTitle>
+                <CardDescription className="font-medium opacity-70">Latest transactions on the network</CardDescription>
               </div>
               <Link href="/transactions">
-                <Button variant="outline" size="sm" className="glass-premium hover:bg-primary/10">
+                <Button variant="outline" size="sm" className="glass-premium hover:bg-primary/10 rounded-full font-bold text-xs">
                   View All
                 </Button>
               </Link>
@@ -248,7 +287,7 @@ export default function Dashboard() {
                 ) : recentTransactions.length === 0 ? (
                   <div className="py-12 text-center">
                     <History className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-20" />
-                    <p className="text-muted-foreground font-medium">No transactions found</p>
+                    <p className="text-muted-foreground font-bold">No transactions found</p>
                   </div>
                 ) : (
                   recentTransactions.map((tx, i) => (
@@ -257,7 +296,7 @@ export default function Dashboard() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 * i }}
-                      className="flex items-center justify-between group p-3 hover:bg-white/5 rounded-2xl transition-colors"
+                      className="flex items-center justify-between group p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-2xl transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 ${
@@ -268,14 +307,14 @@ export default function Dashboard() {
                           <Activity className="w-6 h-6" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm tracking-tight">{formatAddress(tx.to)}</p>
-                          <p className="text-xs text-muted-foreground font-medium">{formatDate(tx.createdAt)}</p>
+                          <p className="font-black text-sm tracking-tight">{formatAddress(tx.to)}</p>
+                          <p className="text-xs text-muted-foreground font-bold opacity-60">{formatDate(tx.createdAt)}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-black text-base">{tx.amount} ALGO</p>
-                        <Link href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" className="text-[10px] text-primary hover:underline flex items-center justify-end font-bold">
-                          EXPLORER <ArrowUpRight className="w-3 h-3 ml-0.5" />
+                        <p className="font-black text-base tracking-tighter">{tx.amount} ALGO</p>
+                        <Link href={`https://testnet.algoexplorer.io/tx/${tx.txId}`} target="_blank" className="text-[10px] text-primary hover:underline flex items-center justify-end font-black uppercase tracking-widest">
+                          Explorer <ArrowUpRight className="w-3 h-3 ml-0.5" />
                         </Link>
                       </div>
                     </motion.div>
@@ -288,10 +327,10 @@ export default function Dashboard() {
 
         <div className="space-y-6">
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
-            <Card className="glass-card overflow-hidden group">
+            <Card className="glass-card overflow-hidden group border-0 shadow-xl">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full" />
                   Total ALGO Sent
                 </CardTitle>
@@ -315,16 +354,16 @@ export default function Dashboard() {
                 )}
               </CardContent>
               <CardFooter className="pt-0">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Aggregated from confirmed txs</p>
+                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Aggregated from confirmed txs</p>
               </CardFooter>
             </Card>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
-            <Card className="glass-card overflow-hidden group">
+            <Card className="glass-card overflow-hidden group border-0 shadow-xl">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   Success Rate
                 </CardTitle>
@@ -362,8 +401,8 @@ export default function Dashboard() {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="pt-0">
-                <div className="w-full bg-muted/30 h-1.5 rounded-full overflow-hidden">
+              <CardFooter className="pt-0 flex flex-col gap-2">
+                <div className="w-full bg-black/10 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: stats?.successRate || '0%' }}
@@ -371,17 +410,18 @@ export default function Dashboard() {
                     transition={{ duration: 1, delay: 1 }}
                   />
                 </div>
+                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Optimized network performance</p>
               </CardFooter>
             </Card>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-            <Card className="glass-card border-l-4 border-l-blue-500 overflow-hidden relative">
+            <Card className="glass-card border-l-4 border-l-blue-500 overflow-hidden relative border-0 shadow-xl">
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                 <Sparkles className="w-16 h-16" />
               </div>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold flex items-center gap-3">
+                <CardTitle className="text-sm font-black flex items-center gap-3 uppercase tracking-widest">
                   <div className="relative">
                     <div className="w-3 h-3 bg-emerald-500 rounded-full" />
                     <div className="absolute inset-0 w-3 h-3 bg-emerald-500 rounded-full animate-ping" />
@@ -390,17 +430,49 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tighter">
+                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
                   <span className="text-muted-foreground">Network</span>
                   <span className="text-emerald-500">TestNet (v3.0)</span>
                 </div>
-                <div className="flex justify-between text-[11px] font-bold uppercase tracking-tighter">
+                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest">
                   <span className="text-muted-foreground">Status</span>
                   <span className="text-emerald-500">Fully Operational</span>
                 </div>
-                <p className="text-[10px] text-yellow-600/80 dark:text-yellow-400/80 leading-tight border-t pt-2 mt-2">
-                  EXPERIMENTAL ENVIRONMENT. DO NOT USE PRODUCTION ASSETS.
-                </p>
+                <div className="border-t border-white/10 pt-3 mt-3">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" className="w-full h-8 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10 text-primary">
+                        <HelpCircle className="w-3.5 h-3.5 mr-2" /> Help Resources
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="glass-premium border-0 shadow-2xl p-0 overflow-hidden sm:max-w-[500px]">
+                      <div className="p-6 space-y-6">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl font-black tracking-tight">TestNet Ecosystem</DialogTitle>
+                          <DialogDescription className="font-medium text-base">Quick access to essential Algorand testing tools.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4">
+                          {testnetResources.map((res) => (
+                            <a key={res.title} href={res.href} target="_blank" rel="noopener noreferrer" className="group">
+                              <div className="p-4 glass-card border border-white/10 group-hover:border-primary/30 group-hover:bg-primary/5 transition-all">
+                                <div className="flex items-center gap-4">
+                                  <div className={`p-3 rounded-2xl ${res.bg} ${res.color}`}>
+                                    <res.icon className="w-6 h-6" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-black text-sm uppercase tracking-widest">{res.title}</h4>
+                                    <p className="text-xs font-medium opacity-70 leading-relaxed">{res.desc}</p>
+                                  </div>
+                                  <ExternalLink className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
